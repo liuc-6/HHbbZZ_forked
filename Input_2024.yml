@@ -1,0 +1,110 @@
+Triggers:
+ - event.HLT_Ele30_WPTight_Gsf
+ - event.HLT_IsoMu24
+
+ - event.HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL
+ - event.HLT_DoubleEle25_CaloIdL_MW
+
+ - event.HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass3p8
+
+ - event.HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL
+ - event.HLT_Mu23_TrkIsoVVL_Ele12_CaloIdL_TrackIdL_IsoVL_DZ
+ - event.HLT_Mu8_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ
+ - event.HLT_Mu12_TrkIsoVVL_Ele23_CaloIdL_TrackIdL_IsoVL_DZ
+ - event.HLT_DiMu9_Ele9_CaloIdL_TrackIdL_DZ
+ - event.HLT_Mu8_DiEle12_CaloIdL_TrackIdL_DZ
+
+ - event.HLT_TripleMu_10_5_5_DZ
+ - event.HLT_TripleMu_12_10_5
+
+Zmass:
+  91.1876
+MZ1cut:
+  40
+MZcut:
+  down:
+    12
+  up:
+    120
+MZZcut:
+  70
+Higgscut:
+  up:
+    160
+  down:
+    105
+
+Electron:
+  pTcut:
+    25
+  Etacut:
+    2.5
+  Sip3dcut:
+    4
+  Loosedxycut:
+    0.5
+  Loosedzcut:
+    1
+  BDTWP:
+    LowEta:
+      LowPT:
+        0.9044286167
+      HighPT:        
+        0.1968600840
+    MedEta:
+      LowPT:
+        0.9094166886
+      HighPT:
+        0.0759172100
+    HighEta:
+      LowPT:
+        0.9443653660
+      HighPT:
+        -0.5169136775
+  Isocut:
+    0.35
+Muon:
+  pTcut:
+    20
+  Etacut:
+    2.4
+  Sip3dcut:
+    4
+  Loosedxycut:
+    0.5
+  Loosedzcut:
+    1
+  Tightdxycut:
+    0.2
+  Tightdzcut:
+    0.5
+  TightTrackerLayercut:
+    5
+  TightpTErrorcut:
+    0.3
+  HighPtBound:
+    200
+  Isocut:
+    0.35
+
+FsrPhoton:
+  pTcut:
+    2
+  Etacut:
+    2.4
+  Isocut:
+    0.8
+  dRlcut:
+    0.5
+  dRlOverPtcut:
+    0.012
+
+Jet:
+  pTcut:
+    30
+  Etacut:
+    2.4
+  Ncut:
+    2
+    
+

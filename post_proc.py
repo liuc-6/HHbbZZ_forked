@@ -109,6 +109,15 @@ def main():
         sfFileName = "DeepCSV_102XSF_V2.csv"  # FIXME: Update for year 2023
 
         modulesToRun.extend(get_corrections_modules(year, data_tag, first_file, isMC, overwritePt))
+        
+    elif "Summer24" in first_file or "Run2024" in first_file:
+        year = 2024
+        data_tag = None            
+        cfgFile = "Input_2024.yml"
+        jsonFileName = "golden_Json/Cert_Collisions2022_355100_362760_Golden.json"
+        sfFileName = "DeepCSV_102XSF_V2.csv"  # FIXME: Update for year 2024
+
+        modulesToRun.extend(get_corrections_modules(year, data_tag, first_file, isMC, overwritePt))
 
     elif "UL18" in first_file or "UL2018" in first_file:
         year = 2018
@@ -193,7 +202,7 @@ def main():
         if year == 2016:
             modulesToRun.extend([puAutoWeight_2016()])
 
-        # PU weight for 2022 and 2023
+        # PU weight for 2022, 2023 and 2024
         pu_weight_module = get_pu_weight_module(year, data_tag)
         if pu_weight_module is not None:
             modulesToRun.insert(0, pu_weight_module)
