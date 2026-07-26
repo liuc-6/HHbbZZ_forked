@@ -11,6 +11,7 @@ sys.path.append("Utils/.")
 
 from color_style import style
 
+# Remove hardcoded path that causes AFS heavyload
 CANONICAL_TARBALL = (
     "/eos/user/l/lyifan/nanoAOD_ntuples5320/canonical/"
     "CMSSW_15_1_1_20260725_v4.tgz"
