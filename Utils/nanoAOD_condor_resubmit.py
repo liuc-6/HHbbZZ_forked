@@ -23,7 +23,7 @@ def files_to_remove(files,dir):
         filelist_to_remove.append(file)
     else:
       print('File could not be opened, adding it to missing files')
-      filelist_to_remove.append(file)
+      filelist_to_remove.append(os.path.basename(file).replace("_SkimHadd","").replace("_Skim",""))
 
   if DEBUG: print(filelist_to_remove)
   return filelist_to_remove
@@ -43,12 +43,49 @@ def list_files(file_name):
   return file_list
 
 def get_files_from_jdl(path_jdl):
-  import re
+  flist = []
   with open(path_jdl) as myfile:
-    content = myfile.read()
-
-  flist = re.findall("[a-z0-9A-Z-]+.root", content)
+    for line in myfile:
+      if not line.startswith("Arguments = "):
+        continue
+      fields = line.strip().split()
+      if len(fields) < 3:
+        continue
+      flist.append(fields[2].split('/')[-1])
   return flist
+
+def get_jdl_header(path_jdl):
+  header = []
+  with open(path_jdl) as myfile:
+    for line in myfile:
+      if line.startswith("Output = "):
+        break
+      header.append(line)
+  return header
+
+def get_jdl_job_blocks(path_jdl):
+  blocks = {}
+  current_block = []
+  with open(path_jdl) as myfile:
+    for line in myfile:
+      if line.startswith("Output = "):
+        current_block = [line]
+        continue
+      if not current_block:
+        continue
+      current_block.append(line)
+      if line.startswith("Queue"):
+        root_name = ""
+        for block_line in current_block:
+          if block_line.startswith("Arguments = "):
+            fields = block_line.strip().split()
+            if len(fields) >= 3:
+              root_name = fields[2].split('/')[-1]
+            break
+        if root_name != "":
+          blocks[root_name] = list(current_block)
+        current_block = []
+  return blocks
 
 def list_root(directory):
   flist = []
@@ -56,7 +93,7 @@ def list_root(directory):
   for root, directories, filenames in os.walk(directory):
     for filename in filenames:
       if filename.endswith(".root"):
-        flist.append(filename.replace("_SkimHadd",""))
+        flist.append(filename.replace("_SkimHadd","").replace("_Skim",""))
         fileWithPath = os.path.join(root,filename)  # Get file name with path
         flistWithPath.append(fileWithPath)
   return flist,flistWithPath
@@ -83,34 +120,18 @@ def prepare_runJobs_missing(FailedJobRootFile,InputJdlFile,CondorLogDir,EOSDir,R
 
   outjdl_file = open(outjdl_fileName,"w")
 
-  with open(InputJdlFile) as myfile:
-      head = [next(myfile) for x in range(7)]  # FIX: remove hardcoded number 7
+  head = get_jdl_header(InputJdlFile)
+  jdl_blocks = get_jdl_job_blocks(InputJdlFile)
 
   for lines in head:
     outjdl_file.write(lines)
 
   for RootFiles in FailedJobRootFile:
     if DEBUG: print(RootFiles)
-    bashCommand = "grep %s %s/*.stdout"%(RootFiles.replace(".root",""),CondorLogDir)
-    if DEBUG: print(bashCommand)
-    grep_stdout_files = os.popen(bashCommand).read()
-    if DEBUG: print("~~"*51)
-    if DEBUG: print(grep_stdout_files.strip())
-    if DEBUG: print(len(grep_stdout_files))
-    if DEBUG: print("~~"*51)
-    OldRefFile = ""
-    if grep_stdout_files.strip() != "":
-      if DEBUG: print("==> ",grep_stdout_files.strip().split(':')[0].replace('.stdout',''))
-      if grep_stdout_files.strip().split(':')[0].replace('.stdout','').split('_')[-2] == "resubmit":
-        OldRefFile = grep_stdout_files.strip().split(':')[0].replace('.stdout','').split('_')[-4]
-      else:
-        OldRefFile = grep_stdout_files.strip().split(':')[0].replace('.stdout','').split('_')[-1]
-    grepCommand_GetJdlInfo = 'grep -A1 -B3 "'+RootFiles+'" '+InputJdlFile
-    if DEBUG: print(grepCommand_GetJdlInfo)
-    grep_condor_jdl_part = os.popen(grepCommand_GetJdlInfo).read()
+    grep_condor_jdl_part = ''.join(jdl_blocks.get(RootFiles, []))
     if DEBUG: print("=="*51)
     if DEBUG: print(grep_condor_jdl_part)
-    updateString = grep_condor_jdl_part.replace('$(Process)',OldRefFile+'_$(Process)'+ '_resubmit_' +Resubmit_no)
+    updateString = grep_condor_jdl_part.replace('$(Process)','resubmit_'+Resubmit_no+'_$(Process)')
     if DEBUG: print("=="*51)
     if DEBUG: print(updateString)
     if DEBUG: print("=="*51)
@@ -132,7 +153,7 @@ def main():
   if options.stage_dest is not None:
     stageDir = os.path.abspath(options.stage_dest)
   else:
-    stageDir = dir
+    stageDir = options.dir
 
   full_output =  get_files_from_jdl(options.input)
   # print full_output
@@ -156,4 +177,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -2,20 +2,51 @@ import ROOT
 import yaml
 
 PI=3.14159
-def PassTrig(event,cfgFile):
-    
-    
-    PassTrig = False
-    with open(cfgFile, 'r') as ymlfile:
-        cfg = yaml.full_load(ymlfile)
-        TriggerList = []
-        for TriggerName in cfg['Triggers']:
-            TriggerList.append(eval(TriggerName))
-         
-    for i in range(len(TriggerList)):
-        PassTrig = PassTrig | TriggerList[i]
 
-    return PassTrig
+
+def _pass_paths(event, paths):
+    return any(bool(getattr(event, path, False)) for path in paths)
+
+
+def _canonical_primary_dataset(primary_dataset):
+    if primary_dataset.startswith("MuonEG") or primary_dataset == "MuEG":
+        return "MuonEG"
+    if primary_dataset.startswith("EGamma"):
+        return "EGamma"
+    if primary_dataset.startswith("Muon"):
+        return "Muon"
+    return primary_dataset
+
+
+def PassTrig(event, trigger_groups, isMC=True, primary_dataset=""):
+    """Apply the Run-3 HZZ trigger OR and data primary-dataset precedence."""
+    passed = {name: _pass_paths(event, paths) for name, paths in trigger_groups.items()}
+    single_ele = passed.get("SingleElectron", False)
+    single_mu = passed.get("SingleMuon", False)
+    di_ele = passed.get("DoubleElectron", False)
+    di_mu = passed.get("DoubleMuon", False)
+    mu_ele = passed.get("MuonElectron", False)
+    tri_ele = passed.get("TripleElectron", False)
+    tri_mu = passed.get("TripleMuon", False)
+
+    if isMC:
+        return any((single_ele, single_mu, di_ele, di_mu, mu_ele, tri_ele, tri_mu))
+
+    pd = _canonical_primary_dataset(primary_dataset)
+    if not pd:
+        raise RuntimeError("Primary dataset is required for data trigger de-duplication")
+
+    if pd in ("DoubleEle", "DoubleEG", "EGamma") and (di_ele or tri_ele):
+        return True
+    if pd in ("Muon", "DoubleMu", "DoubleMuon") and (di_mu or tri_mu) and not (di_ele or tri_ele):
+        return True
+    if pd == "MuonEG" and mu_ele and not (di_mu or tri_mu or di_ele or tri_ele):
+        return True
+    if pd in ("SingleElectron", "EGamma") and single_ele and not (mu_ele or di_mu or tri_mu or di_ele or tri_ele):
+        return True
+    if pd in ("SingleMuon", "Muon") and single_mu and not (single_ele or mu_ele or di_mu or tri_mu or di_ele or tri_ele):
+        return True
+    return False
 
 def goodLooseElectrons2012(electrons, elePtcut):
     goodElectrons = []

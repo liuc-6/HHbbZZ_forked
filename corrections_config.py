@@ -13,7 +13,10 @@ from PhysicsTools.NATModules.modules.puWeightProducer import puWeightProducer as
 from PhysicsTools.NATModules.modules.jetId import jetId as jetId_natlib
 from PhysicsTools.NATModules.modules.jetVetoMap import jetVMAP as jetVMAP_natlib
 from PhysicsTools.NATModules.modules.jetCorr import jetJERC as jetJERC_natlib
-from PhysicsTools.NATModules.modules.jetBtag import jetBtag as jetBtag_natlib
+try:
+    from PhysicsTools.NATModules.modules.jetBtag import jetBtag as jetBtag_natlib
+except ModuleNotFoundError:
+    jetBtag_natlib = None
 from PhysicsTools.NanoAODTools.postprocessing.modules.common.muonScaleResProducer import (
     muonScaleRes2016, muonScaleRes2017, muonScaleRes2018
 )
@@ -132,7 +135,9 @@ def get_electron_scale_res_2022(data_tag, isMC, overwritePt):
         scaleKey = "Scale"
         smearKey = "SmearAndSyst"
     
-    return eleScaleRes_natlib(eleScale_json, scaleKey, smearKey, overwritePt)
+    return eleScaleRes_natlib(
+        eleScale_json, scaleKey, smearKey if isMC else None, overwritePt
+    )
 
 
 def get_electron_sf_2023(data_tag, isMC):
@@ -247,7 +252,9 @@ def get_electron_scale_res_2023(data_tag, isMC, overwritePt):
         scaleKey = "Scale"
         smearKey = "SmearAndSyst"
     
-    return eleScaleRes_natlib(json_path, scaleKey, smearKey, overwritePt)
+    return eleScaleRes_natlib(
+        json_path, scaleKey, smearKey if isMC else None, overwritePt
+    )
 
 
 def get_electron_sf_2024(data_tag, isMC):
@@ -256,7 +263,7 @@ def get_electron_sf_2024(data_tag, isMC):
     # 2024 prompt uses split JSONs:
     #   - electron_v1.json.gz      : reco SF
     #   - electronID_v1.json.gz    : ID SF
-    reco_id_json = "/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/electron.json.gz"
+    reco_id_json = "/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-12-15/electron.json.gz"
     
     era = "2024Prompt"
 
@@ -294,16 +301,18 @@ def get_electron_sf_2024(data_tag, isMC):
 def get_electron_scale_res_2024(data_tag, isMC, overwritePt):
     """Get electron scale/resolution corrections for 2024."""
 
-    json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/electronSS_EtDependent.json.gz"
-    scaleKey = "Scale"
-    smearKey = "SmearAndSyst"
+    json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-08-15/electronSS_EtDependent_v1.json.gz"
+    scaleKey = "EGMScale_Compound_Ele_2024"
+    smearKey = "EGMSmearAndSyst_ElePTsplit_2024"
 
-    return eleScaleRes_natlib(json_path, scaleKey, smearKey, overwritePt)
+    return eleScaleRes_natlib(
+        json_path, scaleKey, smearKey if isMC else None, overwritePt
+    )
 
 def get_muon_sf_2024(data_tag, isMC):
     """Get muon scale factor corrections for 2024."""
 
-    muSF = muonSF_natlib("/cvmfs/cms-griddata.cern.ch/cat/metadata/MUO/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/muon_Z.json.gz")
+    muSF = muonSF_natlib("/cvmfs/cms-griddata.cern.ch/cat/metadata/MUO/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2026-06-18/muon_Z.json.gz")
 
     # ID SFs
     muSF.addCorrection("NUM_LooseID_DEN_TrackerMuons",  "nominal", "LooseIDSF")
@@ -336,7 +345,7 @@ def get_muon_sf_2024(data_tag, isMC):
 def get_muon_scale_res_2024(data_tag, isMC, overwritePt):
     """Get muon scale/resolution corrections for 2024."""
     
-    muon_json = "/cvmfs/cms-griddata.cern.ch/cat/metadata/MUO/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/muon_scalesmearing.json.gz"
+    muon_json = "/cvmfs/cms-griddata.cern.ch/cat/metadata/MUO/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2026-04-28/muon_scalesmearing.json.gz"
     
     return muonScaleRes_natlib(muon_json, is_mc=isMC, overwritePt=overwritePt, minPt=3.)
 
@@ -476,49 +485,44 @@ def get_pu_weight_2023(data_tag):
 
 def get_pu_weight_2024(data_tag):
     """Get PU weight producer for 2024."""
-    json = "/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/puWeights_CDEFGHI.json.gz"
-    key = "Collisions24_CDEFGHI_goldenJSON"
+    json = "/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2026-04-15/puWeights_BCDEFGHI.json.gz"
+    key = "Collisions24_BCDEFGHI_goldenJSON"
 
     return puWeightProducer_natlib(json, key)
 
-def get_jet_id_2022(data_tag):
-    """Update Jet_jetId for 2022 NanoAODv12 using the Twiki recipe."""
-
-    return jetId_natlib("", nanoVersion=12)
-
-def get_jet_id_2023(data_tag, nanoVersion):
-    """
-    Recompute Jet_jetId for 2023.
-
-    NanoAODv12:
-      Use the Twiki recipe, because v12 does not contain all inputs needed by the JME jetid.json.gz correction.
-
-    NanoAODv13 and above:
-      Use the JME jetid.json.gz, similar to NanoAODv15.
-    """
+def get_jet_id_2022(data_tag, nanoVersion):
+    """Recompute Jet_jetId when it is absent from 2022 NanoAODv15."""
 
     if nanoVersion == 12:
-        return jetId_natlib("", nanoVersion=12)
+        return None
+    era = "Run3-22CDSep23-Summer22" if "pre_EE" in data_tag else "Run3-22EFGSep23-Summer22EE"
+    json_path = f"/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/{era}-NanoAODv12/latest/jetid.json.gz"
+    if not os.path.exists(json_path):
+        raise RuntimeError(f"Cannot find 2022 NanoAODv{nanoVersion} JetID JSON: {json_path}")
+    return jetId_natlib(json_path)
 
-    if nanoVersion >= 13:
-        if "pre_BPix" in data_tag:
-            json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-23CSep23-Summer23-NanoAODv12/latest/jetid.json.gz"
-        else:
-            json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-23DSep23-Summer23BPix-NanoAODv12/latest/jetid.json.gz"
+def get_jet_id_2023(data_tag, nanoVersion):
+    """Recompute Jet_jetId for 2023 using JME jetid.json.gz."""
 
-        if not os.path.exists(json_path):
-            raise RuntimeError(f"Cannot find 2023 NanoAODv{nanoVersion} JetID JSON: {json_path}")
+    if nanoVersion == 12:
+        return None
 
-        return jetId_natlib(json_path, nanoVersion=nanoVersion)
+    if "pre_BPix" in data_tag:
+        json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-23CSep23-Summer23-NanoAODv12/latest/jetid.json.gz"
+    else:
+        json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-23DSep23-Summer23BPix-NanoAODv12/latest/jetid.json.gz"
 
-    raise RuntimeError(f"Unsupported NanoAOD version for 2023 JetID: {nanoVersion}")
+    if not os.path.exists(json_path):
+        raise RuntimeError(f"Cannot find 2023 NanoAODv{nanoVersion} JetID JSON: {json_path}")
+
+    return jetId_natlib(json_path)
 
 def get_jet_id_2024(data_tag):
     """Recompute Jet_jetId for 2024 NanoAODv15 using JME jetid.json.gz."""
 
-    json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/jetid.json.gz"
+    json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2026-06-05/jetid.json.gz"
 
-    return jetId_natlib(json_path, nanoVersion=15)
+    return jetId_natlib(json_path)
 
 def get_jet_veto_map_2022(data_tag):
     """Get jet veto map module for 2022."""
@@ -546,7 +550,7 @@ def get_jet_veto_map_2023(data_tag):
 
 def get_jet_veto_map_2024(data_tag):
     """Get jet veto map module for 2024."""
-    json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/latest/jetvetomaps.json.gz"
+    json_path = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-12-02/jetvetomaps.json.gz"
     corrName = "Summer24Prompt24_RunBCDEFGHI_V1"
     
     return jetVMAP_natlib(json_path, corrName, "jetvetomap")
@@ -625,7 +629,7 @@ def get_jet_correction_2022(data_tag, isMC):
             JERsfKey = None
     
     json_JERC = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/%s/jet_jerc.json.gz" % (folderKey)
-    json_JERsmear = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/JME/jer_smear.json.gz"
+    json_JERsmear = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/JER-Smearing/2025-11-03/jer_smear.json.gz"
     
     # Configuration flags
     overwritePt = True
@@ -713,7 +717,7 @@ def get_jet_correction_2023(data_tag, isMC):
             JERsfKey = None
     
     json_JERC = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/%s/jet_jerc.json.gz" % (folderKey)
-    json_JERsmear = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/JME/jer_smear.json.gz"
+    json_JERsmear = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/JER-Smearing/2025-11-03/jer_smear.json.gz"
     
     # Configuration flags
     overwritePt = True
@@ -749,34 +753,34 @@ def get_jet_correction_2024(data_tag, isMC):
     ]
     
     if isMC:
-        folderKey = "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-12-02"
-        L1Key = "Summer24Prompt24_V2_MC_L1FastJet_AK4PFPuppi"
-        L2Key = "Summer24Prompt24_V2_MC_L2Relative_AK4PFPuppi"
-        L3Key = "Summer24Prompt24_V2_MC_L3Absolute_AK4PFPuppi"
-        L2L3Key = "Summer24Prompt24_V2_MC_L2L3Residual_AK4PFPuppi"
-        scaleTotalKey = "Summer24Prompt24_V2_MC_Total_AK4PFPuppi"
+        folderKey = "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2026-06-05"
+        L1Key = "Summer24Prompt24_V3_MC_L1FastJet_AK4PFPuppi"
+        L2Key = "Summer24Prompt24_V3_MC_L2Relative_AK4PFPuppi"
+        L3Key = "Summer24Prompt24_V3_MC_L3Absolute_AK4PFPuppi"
+        L2L3Key = "Summer24Prompt24_V3_MC_L2L3Residual_AK4PFPuppi"
+        scaleTotalKey = "Summer24Prompt24_V3_MC_Total_AK4PFPuppi"
         scaleKeyRegrouped11 = [
-            f"Summer24Prompt24_V2_MC_{label.format(year='2024')}_AK4PFPuppi" for label in jes_systematics_11split
+            f"Summer24Prompt24_V3_MC_{label.format(year='2024')}_AK4PFPuppi" for label in jes_systematics_11split
         ]
         smearKey = "JERSmear"
-        # It appears the 23BPix keys are used for the following:
-        JERKey = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi"
-        JERsfKey = "Summer23BPixPrompt23_RunD_JRV1_MC_ScaleFactor_AK4PFPuppi"
+        # Summer24 JER uses a nominal SF plus a separate SFUncertainty correction.
+        JERKey = "Summer24Prompt24_JRV1_MC_PtResolution_AK4PFPuppi"
+        JERsfKey = "Summer24Prompt24_JRV1_MC_ScaleFactor_AK4PFPuppi"
     else:
         # Data - JER are not applied to data
-        folderKey = "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-12-02"
-        L1Key = "Summer24Prompt24_V2_DATA_L1FastJet_AK4PFPuppi"
-        L2Key = "Summer24Prompt24_V2_DATA_L2Relative_AK4PFPuppi"
-        L3Key = "Summer24Prompt24_V2_DATA_L3Absolute_AK4PFPuppi"
-        L2L3Key = "Summer24Prompt24_V2_DATA_L2L3Residual_AK4PFPuppi"
+        folderKey = "Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2026-06-05"
+        L1Key = "Summer24Prompt24_V3_DATA_L1FastJet_AK4PFPuppi"
+        L2Key = "Summer24Prompt24_V3_DATA_L2Relative_AK4PFPuppi"
+        L3Key = "Summer24Prompt24_V3_DATA_L3Absolute_AK4PFPuppi"
+        L2L3Key = "Summer24Prompt24_V3_DATA_L2L3Residual_AK4PFPuppi"
         scaleTotalKey = None
         scaleKeyRegrouped11 = None
         smearKey = None
         JERKey = None
         JERsfKey = None
     
-    json_JERC = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-12-02/jet_jerc.json.gz"
-    json_JERsmear = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/JME/jer_smear.json.gz"
+    json_JERC = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/%s/jet_jerc.json.gz" % folderKey
+    json_JERsmear = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/JER-Smearing/2025-11-03/jer_smear.json.gz"
     
     # Configuration flags
     overwritePt = True
@@ -806,6 +810,9 @@ _RPT_WP = "M"
 
 def get_btag_sf_2022(data_tag, isMC):
     """Get b-tagging SF correction for 2022 (RobustParTAK4B, Medium WP)."""
+    if jetBtag_natlib is None:
+        raise RuntimeError("PhysicsTools.NATModules.modules.jetBtag is not available.")
+
     if "pre_EE" in data_tag:
         json_SF = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/2022_Summer22/btagging.json.gz"
         json_eff = os.path.join(_btag_data_dir, "2022_Summer22_RPT_M_eff.json.gz")
@@ -825,6 +832,9 @@ def get_btag_sf_2022(data_tag, isMC):
 
 def get_btag_sf_2023(data_tag, isMC):
     """Get b-tagging SF correction for 2023 (RobustParTAK4B, Medium WP)."""
+    if jetBtag_natlib is None:
+        raise RuntimeError("PhysicsTools.NATModules.modules.jetBtag is not available.")
+
     if "pre_BPix" in data_tag:
         json_SF = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/2023_Summer23/btagging.json.gz"
         json_eff = os.path.join(_btag_data_dir, "2023_Summer23_RPT_M_eff.json.gz")
@@ -851,7 +861,7 @@ def get_kfactor_module(year, file_path, kfactor_dir=None):
 
     path_lower = file_path.lower().strip()
 
-    is_ggzz = "gluglutocontinto2z" in path_lower
+    is_ggzz = ("gluglutocontinto2z" in path_lower) or ("gluglu2zto" in path_lower)
     is_qqzz = ("zzto4l" in path_lower) and ("glugluhtozzto4l" not in path_lower)
 
     if is_ggzz or is_qqzz:
@@ -884,30 +894,37 @@ def get_corrections_modules(year, data_tag, first_file, isMC, overwritePt, nanoV
             modules.append(kfactor_module)
     
     if year == 2022:
-        modules.append(get_electron_sf_2022(data_tag, isMC))
-        modules.append(get_muon_sf_2022(data_tag, isMC))
         modules.append(get_muon_scale_res_2022(data_tag, isMC, overwritePt))
         modules.append(get_electron_scale_res_2022(data_tag, isMC, overwritePt))
+        if isMC:
+            modules.append(get_electron_sf_2022(data_tag, isMC))
+            modules.append(get_muon_sf_2022(data_tag, isMC))
         modules.append(get_jet_correction_2022(data_tag, isMC))
-        modules.append(get_jet_id_2022(data_tag))
+        jet_id_module = get_jet_id_2022(data_tag, nanoVersion)
+        if jet_id_module is not None:
+            modules.append(jet_id_module)
         modules.append(get_jet_veto_map_2022(data_tag))
         #modules.append(get_btag_sf_2022(data_tag, isMC))
     
     elif year == 2023:
-        modules.append(get_electron_sf_2023(data_tag, isMC))
-        modules.append(get_muon_sf_2023(data_tag, isMC))
         modules.append(get_muon_scale_res_2023(data_tag, isMC, overwritePt))
         modules.append(get_electron_scale_res_2023(data_tag, isMC, overwritePt))
+        if isMC:
+            modules.append(get_electron_sf_2023(data_tag, isMC))
+            modules.append(get_muon_sf_2023(data_tag, isMC))
         modules.append(get_jet_correction_2023(data_tag, isMC))
-        modules.append(get_jet_id_2023(data_tag, nanoVersion))
+        jet_id_module = get_jet_id_2023(data_tag, nanoVersion)
+        if jet_id_module is not None:
+            modules.append(jet_id_module)
         modules.append(get_jet_veto_map_2023(data_tag))
         #modules.append(get_btag_sf_2023(data_tag, isMC))
     
     elif year == 2024:
-        modules.extend(get_electron_sf_2024(data_tag, isMC))
-        modules.append(get_muon_sf_2024(data_tag, isMC))
         modules.append(get_muon_scale_res_2024(data_tag, isMC, overwritePt))
         modules.append(get_electron_scale_res_2024(data_tag, isMC, overwritePt))
+        if isMC:
+            modules.extend(get_electron_sf_2024(data_tag, isMC))
+            modules.append(get_muon_sf_2024(data_tag, isMC))
         modules.append(get_jet_correction_2024(data_tag, isMC))
         modules.append(get_jet_id_2024(data_tag))
         modules.append(get_jet_veto_map_2024(data_tag))
@@ -952,4 +969,3 @@ def get_pu_weight_module(year, data_tag):
         return get_pu_weight_2024(data_tag)
     
     return None
-

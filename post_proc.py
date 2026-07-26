@@ -20,13 +20,27 @@ from JetSFMaker import *
 
 def parse_arguments():
     """Parse command line arguments."""
+    def str2bool(value):
+        if isinstance(value, bool):
+            return value
+        value = value.lower()
+        if value in ("true", "1", "yes", "y"):
+            return True
+        if value in ("false", "0", "no", "n"):
+            return False
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--inputFile", default="", type=str, help="Input file name")
     parser.add_argument("-n", "--entriesToRun", default=100, type=int,help="Set to 0 if need to run over all entries else put number of entries to run")
-    parser.add_argument("-d", "--DownloadFileToLocalThenRun", default=True, type=bool,help="Download file to local then run")
+    parser.add_argument("-d", "--DownloadFileToLocalThenRun", default=True, type=str2bool,help="Download file to local then run")
+    parser.add_argument("-o", "--outputDir", default=".", type=str, help="Output directory")
+    parser.add_argument("--dataset", default="", help="Full DAS dataset name; required for unambiguous data processing")
+    parser.add_argument("--primaryDataset", default="", help="Primary dataset override for local data tests")
+    parser.add_argument("--nanoVersion", type=int, choices=[12, 13, 15], help="NanoAOD version override")
     parser.add_argument("--NOsyst", default=False, action="store_true", help="Do not run systematics")
     parser.add_argument("--overwritePt", default=True, type=bool,help="overwrite muon pt from muon scale and res corrections")
-    parser.add_argument("--mode", default="4l2j", choices=["4l", "2l2j", "4l2j"],help="Analysis mode: 4l, 2l2j, or 4l2j")
+    parser.add_argument("--mode", default="4l2j", choices=["4l", "2l2j", "4l1j", "4l2j"],help="Analysis mode: 4l, 2l2j, 4l1j, or 4l2j")
     return parser.parse_args()
 
 def getListFromFile(filename):
@@ -50,6 +64,7 @@ def main():
     sfFileName = None
     overwritePt = args.overwritePt
     analysisMode = args.mode
+    outputDir = args.outputDir
 
     entriesToRun = int(args.entriesToRun)
     DownloadFileToLocalThenRun = args.DownloadFileToLocalThenRun
@@ -68,23 +83,32 @@ def main():
         print("ERROR: No input files found. Exiting.")
         exit(1)
 
-    # Determine year / MC-data type from first file
+    # Dataset metadata is authoritative because data LFNs omit campaign and primary dataset.
     first_file = testfilelist[0]
-    isMC = "/data/" not in first_file
+    metadata_source = args.dataset or first_file
+    if args.dataset:
+        if not args.dataset.startswith("/") or not args.dataset.endswith(("/NANOAOD", "/NANOAODSIM")):
+            raise RuntimeError("--dataset must be a full DAS NANOAOD(SIM) dataset name")
+        isMC = args.dataset.endswith("/NANOAODSIM")
+    else:
+        isMC = "/data/" not in metadata_source
+    primary_dataset = args.primaryDataset
+    if not isMC and args.dataset:
+        primary_dataset = args.dataset.split("/")[1]
 
-    print(first_file, "\n isMC = ", isMC)
+    print(first_file, "\n isMC = ", isMC, "\n dataset = ", args.dataset or "<inferred>")
 
-    if "Summer22" in first_file or "Run2022" in first_file:
+    if "Summer22" in metadata_source or "Run2022" in metadata_source:
         year = 2022
         if isMC:
-            if "22EE" in first_file:
+            if "22EE" in metadata_source:
                 data_tag = "post_EE"
             else:
                 data_tag = "pre_EE"
             
             jsonFileName = None  # Golden JSON is only used for data, not for MC
         else:
-            if ("Run2022E" in first_file) or ("Run2022F" in first_file) or ("Run2022G" in first_file):
+            if ("Run2022E" in metadata_source) or ("Run2022F" in metadata_source) or ("Run2022G" in metadata_source):
                 data_tag = "post_EE"
             else:
                 data_tag = "pre_EE"
@@ -94,17 +118,17 @@ def main():
         cfgFile = "Input_2022.yml"
         sfFileName = "DeepCSV_102XSF_V2.csv"  # FIXME: Update for year 2022
 
-    elif "Summer23" in first_file or "Run2023" in first_file:
+    elif "Summer23" in metadata_source or "Run2023" in metadata_source:
         year = 2023
         if isMC:
-            if "23BPix" in first_file:
+            if "23BPix" in metadata_source:
                 data_tag = "post_BPix"
             else:
                 data_tag = "pre_BPix"
                 
             jsonFileName = None  # Golden JSON is only used for data, not for MC
         else:
-            if "Run2023D" in first_file:
+            if "Run2023D" in metadata_source:
                 data_tag = "post_BPix"
             else:
                 data_tag = "pre_BPix"
@@ -114,7 +138,7 @@ def main():
         cfgFile = "Input_2023.yml"
         sfFileName = "DeepCSV_102XSF_V2.csv"  # FIXME: Update for year 2023
 
-    elif "Summer24" in first_file or "Run2024" in first_file:
+    elif "Summer24" in metadata_source or "Run2024" in metadata_source:
         year = 2024
         data_tag = None            
         cfgFile = "Input_2024.yml"
@@ -126,19 +150,19 @@ def main():
             
         sfFileName = "DeepCSV_102XSF_V2.csv"  # FIXME: Update for year 2024
 
-    elif "UL18" in first_file or "UL2018" in first_file:
+    elif "UL18" in metadata_source or "UL2018" in metadata_source:
         year = 2018
         cfgFile = "Input_2018.yml"
         jsonFileName = "golden_Json/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt"
         sfFileName = "DeepCSV_102XSF_V2.csv"
 
-    elif "UL17" in first_file or "UL2017" in first_file:
+    elif "UL17" in metadata_source or "UL2017" in metadata_source:
         year = 2017
         cfgFile = "Input_2017.yml"
         jsonFileName = "golden_Json/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt"
         sfFileName = "DeepCSV_102XSF_V2.csv"
 
-    elif "UL16" in first_file or "UL2016" in first_file:
+    elif "UL16" in metadata_source or "UL2016" in metadata_source:
         year = 2016
         cfgFile = "Input_2016.yml"
         jsonFileName = "golden_Json/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt"
@@ -148,25 +172,26 @@ def main():
         print("ERROR: Could not determine year from input file name.")
         exit(1)
 
-    if isMC:
-        if "NanoAODv12" in first_file:
-            nanoVersion = 12
-        elif "NanoAODv13" in first_file:
-            nanoVersion = 13
-        elif "NanoAODv15" in first_file:
-            nanoVersion = 15
-        else:
-            raise RuntimeError(f"Cannot determine nanoVersion from MC input file name: {first_file}")
-    # For data, we determine nanoVersion based on the run era since the nanoAOD version is not included in the file name.
+    if args.nanoVersion:
+        nanoVersion = args.nanoVersion
+    elif "NanoAODv12" in metadata_source or "NANOAODv12" in metadata_source:
+        nanoVersion = 12
+    elif "NanoAODv13" in metadata_source or "NANOAODv13" in metadata_source:
+        nanoVersion = 13
+    elif "NanoAODv15" in metadata_source or "NANOv15" in metadata_source:
+        nanoVersion = 15
+    elif isMC:
+        raise RuntimeError("Cannot determine nanoVersion from MC metadata: {}".format(metadata_source))
     else:
-        if "Run2022" in first_file or "Run2023" in first_file:
-            nanoVersion = 12
-        else:
-            nanoVersion = 15
+        nanoVersion = 12
+
+    if not isMC and not primary_dataset:
+        raise RuntimeError("Data processing requires --dataset or --primaryDataset for trigger de-duplication")
     print("Determined nanoVersion: {}".format(nanoVersion))
+    print("Primary dataset: {}".format(primary_dataset or "MC"))
     
     modulesToRun.extend(
-        get_corrections_modules(year, data_tag, first_file, isMC, overwritePt, nanoVersion)
+        get_corrections_modules(year, data_tag, metadata_source, isMC, overwritePt, nanoVersion)
     )
     
     # ---------------------------
@@ -175,11 +200,11 @@ def main():
     if analysisMode == "2l2j":
         preselection_cut = "Sum$(Muon_pt>20) + Sum$(Electron_pt>25) >= 2"
     else:
-        # for 4l and 4l2j
+        # for 4l, 4l1j and 4l2j
         preselection_cut = "Sum$(Muon_pt>3) + Sum$(Electron_pt>5) >= 4"
 
     # main analysis module
-    modulesToRun.append(HZZAnalysisCppProducer(year, cfgFile, isMC, isFSR, analysisMode, nanoVersion))
+    modulesToRun.append(HZZAnalysisCppProducer(year, cfgFile, isMC, isFSR, analysisMode, nanoVersion, primary_dataset))
 
     print(("Input json file: {}".format(jsonFileName)))
     print(("Input cfg file: {}".format(cfgFile)))
@@ -215,7 +240,7 @@ def main():
         # INFO: Keep the `fwkJobReport=False` to trigger `haddnano.py`
         # otherwise the output file will have larger size than expected.
         p = PostProcessor(
-            ".",
+            outputDir,
             testfilelist,
             #cut = "(Sum$(Muon_pt>3) + Sum$(Electron_pt>5) >= 4) && (nJet>=2)",
             cut=preselection_cut,
@@ -237,7 +262,7 @@ def main():
         #     modulesToRun.extend([jetmetCorrector(), fatJetCorrector()])
 
         p = PostProcessor(
-            ".",
+            outputDir,
             testfilelist,
             # cut = "(Sum$(Muon_pt>3) + Sum$(Electron_pt>5) >= 4) && (Sum$(Jet_pt>20)>=2)",
             cut=preselection_cut,

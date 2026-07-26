@@ -33,6 +33,9 @@ keep *j2
 keep pass*
 #keep GEN*
 keep njet*
+keep ngoodJets
+keep goodJet*
+keep btag*
 keep D_*
 keep lep*
 keep *Weight

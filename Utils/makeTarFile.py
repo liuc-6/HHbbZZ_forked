@@ -1,7 +1,11 @@
+import fnmatch
 import tarfile
 import os
 
 EXCLUDE_FILES = [".tmp", ".log", ".stdout", ".stderr"]
+EXCLUDE_PATTERNS = [
+    "*_cc.d",
+]
 
 def filter_function(tarinfo):
     """
@@ -15,7 +19,10 @@ def filter_function(tarinfo):
     Returns:
         bool -- True if the file should be included, False otherwise.
     """
+    basename = os.path.basename(tarinfo.name)
     if os.path.splitext(tarinfo.name)[1] in EXCLUDE_FILES:
+        return None
+    if any(fnmatch.fnmatch(basename, pattern) for pattern in EXCLUDE_PATTERNS):
         return None
     else:
         return tarinfo

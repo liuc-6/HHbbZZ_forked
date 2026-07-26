@@ -38,7 +38,7 @@ class kFactorProducer(Module):
         full_path_lower = sample_path.lower().strip()
 
         # ggZZ continuum
-        self.is_ggzz = "gluglutocontinto2z" in full_path_lower
+        self.is_ggzz = ("gluglutocontinto2z" in full_path_lower) or ("gluglu2zto" in full_path_lower)
 
         # qqZZ background:
         self.is_qqzz = ("zzto4l" in full_path_lower) and ("glugluhtozzto4l" not in full_path_lower)
@@ -103,14 +103,12 @@ class kFactorProducer(Module):
         lib_path = os.path.join(current_dir, "src", "GenAnalysis_cc.so")
         
         if not os.path.exists(lib_path):
-            src_path = os.path.join(current_dir, "src", "GenAnalysis.cc")
-            if os.path.exists(src_path):
-                ROOT.gROOT.ProcessLine(f".L {src_path}+")
-            else:
-                print(f"[kFactorProducer] ERROR: GenAnalysis source not found")
-                sys.exit(1)
-        else:
-            ROOT.gSystem.Load(lib_path)
+            print(f"[kFactorProducer] ERROR: Prebuilt GenAnalysis library not found: {lib_path}")
+            sys.exit(1)
+
+        if ROOT.gSystem.Load(lib_path) < 0:
+            print(f"[kFactorProducer] ERROR: Failed to load prebuilt GenAnalysis library: {lib_path}")
+            sys.exit(1)
         
         self.gen_analyzer = ROOT.GenAnalysis()
     

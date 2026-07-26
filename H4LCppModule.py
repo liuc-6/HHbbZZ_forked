@@ -8,7 +8,7 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 
 class HZZAnalysisCppProducer(Module):
-    def __init__(self, year, cfgFile, isMC, isFSR, analysisMode, nanoVersion):
+    def __init__(self, year, cfgFile, isMC, isFSR, analysisMode, nanoVersion, primaryDataset=""):
         base = "$CMSSW_BASE/src/PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim"
         ROOT.gSystem.Load("%s/JHUGenMELA/MELA/data/el9_amd64_gcc12/libJHUGenMELAMELA.so" % base)
         ROOT.gSystem.Load("%s/JHUGenMELA/MELA/data/el9_amd64_gcc12/libjhugenmela.so" % base)
@@ -17,32 +17,27 @@ class HZZAnalysisCppProducer(Module):
 
         if "/GenAnalysis_cc.so" not in ROOT.gSystem.GetLibraries():
             print("Load GenAnalysis C++ module")
-            base = "$CMSSW_BASE/src/PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim"
-            if base:
-                ROOT.gROOT.ProcessLine(".L %s/src/GenAnalysis.cc+O" % base)
-            else:
-                base = "$CMSSW_BASE//src/PhysicsTools/NanoAODTools"
-                ROOT.gSystem.Load("libPhysicsToolsNanoAODTools.so")
-                ROOT.gROOT.ProcessLine(".L %s/interface/GenAnalysis.h" % base)
+            gen_lib = "%s/src/GenAnalysis_cc.so" % base
+            if ROOT.gSystem.Load(gen_lib) < 0:
+                raise RuntimeError("Failed to load prebuilt library %s" % gen_lib)
 
         if "/H4LTools_cc.so" not in ROOT.gSystem.GetLibraries():
             print("Load H4LTools C++ module")
-            base = "$CMSSW_BASE/src/PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim"
-            if base:
-                ROOT.gROOT.ProcessLine(".L %s/src/H4LTools.cc+O" % base)
-            else:
-                base = "$CMSSW_BASE//src/PhysicsTools/NanoAODTools"
-                ROOT.gSystem.Load("libPhysicsToolsNanoAODTools.so")
-                ROOT.gROOT.ProcessLine(".L %s/interface/H4LTools.h" % base)
+            h4l_lib = "%s/src/H4LTools_cc.so" % base
+            if ROOT.gSystem.Load(h4l_lib) < 0:
+                raise RuntimeError("Failed to load prebuilt library %s" % h4l_lib)
 
         self.year = year
         self.isMC = isMC
+        self.primaryDataset = primaryDataset
         self.analysisMode = analysisMode
+        self.cppAnalysisMode = "4l" if analysisMode == "4l1j" else analysisMode
         self.nanoVersion = nanoVersion
         self.genworker = ROOT.GenAnalysis()
 
         with open(cfgFile, 'r') as ymlfile:
             cfg = yaml.full_load(ymlfile)
+            self.triggerGroups = cfg["TriggerGroups"]
             self.worker = ROOT.H4LTools(self.year, self.isMC)
             self.worker.InitializeElecut(
                 cfg['Electron']['pTcut'], cfg['Electron']['Etacut'], cfg['Electron']['Sip3dcut'],
@@ -74,7 +69,7 @@ class HZZAnalysisCppProducer(Module):
         self.passZZEvts = 0
         self.cfgFile = cfgFile
         self.worker.isFSR = isFSR
-        self.worker.SetAnalysisMode(self.analysisMode)
+        self.worker.SetAnalysisMode(self.cppAnalysisMode)
         self.worker.SetNanoVersion(self.nanoVersion)
         self.print_count = 0
 
@@ -274,7 +269,7 @@ class HZZAnalysisCppProducer(Module):
 
     def analyze(self, event):
         self.worker.Initialize()
-        self.worker.SetAnalysisMode(self.analysisMode)
+        self.worker.SetAnalysisMode(self.cppAnalysisMode)
 
         isMC = self.isMC
         self.worker.SetObjectNum(event.nElectron, event.nMuon, event.nJet, event.nFsrPhoton)
@@ -395,7 +390,7 @@ class HZZAnalysisCppProducer(Module):
         phiL4 = -99
         massL4 = -99
 
-        passedTrig = PassTrig(event, self.cfgFile)
+        passedTrig = PassTrig(event, self.triggerGroups, self.isMC, self.primaryDataset)
         if passedTrig:
             self.passtrigEvts += 1
         else:
@@ -633,6 +628,9 @@ class HZZAnalysisCppProducer(Module):
         foundZZCandidate = False
         if hasTwoTightLeps:
             foundZZCandidate = self.worker.ZZSelection()
+        ngoodJets = int(len(self.worker.jetidx))
+        if self.analysisMode == "4l1j" and foundZZCandidate and ngoodJets < 1:
+            foundZZCandidate = False
         
         eventPassTwoTightLeps = bool(self.worker.eventPassTwoTightLeps)
         eventPassZCand = bool(self.worker.eventPassZCand)
@@ -645,7 +643,6 @@ class HZZAnalysisCppProducer(Module):
         eventPassFinal = bool(self.worker.eventPassFinal)
 
         nZCand = int(self.worker.Zsize)
-        ngoodJets = int(len(self.worker.jetidx))
         
         passedFullSelection = foundZZCandidate
 
@@ -677,7 +674,7 @@ class HZZAnalysisCppProducer(Module):
         if self.worker.RecoTwoMuTwoEEvent:
             finalState = 4
 
-        if foundZZCandidate and self.analysisMode in ["4l", "4l2j"]:
+        if foundZZCandidate and self.analysisMode in ["4l", "4l1j", "4l2j"]:
             pTZ1 = self.worker.Z1.Pt()
             etaZ1 = self.worker.Z1.Eta()
             phiZ1 = self.worker.Z1.Phi()
@@ -715,7 +712,7 @@ class HZZAnalysisCppProducer(Module):
             D_L1 = -99.
             D_L1Zg = -99.
             
-        if self.analysisMode in ["4l", "4l2j"] and foundZZCandidate:
+        if self.analysisMode in ["4l", "4l1j", "4l2j"] and foundZZCandidate:
             pTL1 = self.worker.pTL1
             etaL1 = self.worker.etaL1
             phiL1 = self.worker.phiL1
@@ -748,6 +745,66 @@ class HZZAnalysisCppProducer(Module):
                 phiL3, phiL4 = phiL4, phiL3
                 massL3, massL4 = massL4, massL3
 
+        if self.analysisMode == "4l1j" and foundZZCandidate:
+            goodJet_idxs = [int(idx) for idx in self.worker.jetidx]
+            btag_attr = "btagUParTAK4B" if useUPT else "btagRobustParTAK4B"
+            ranked_jet_idxs = sorted(
+                goodJet_idxs,
+                key=lambda idx: getattr(jets[idx], btag_attr, -999.),
+                reverse=True
+            )
+
+            jet1index = ranked_jet_idxs[0]
+            Jet1 = ROOT.TLorentzVector()
+            Jet1.SetPtEtaPhiM(
+                jets[jet1index].pt,
+                jets[jet1index].eta,
+                jets[jet1index].phi,
+                jets[jet1index].mass
+            )
+
+            pTj1 = Jet1.Pt()
+            etaj1 = Jet1.Eta()
+            phij1 = Jet1.Phi()
+            mj1 = Jet1.M()
+
+            btagger1_DJ = getattr(jets[jet1index], "btagDeepFlavB", -999.)
+            btagger1_PN = getattr(jets[jet1index], "btagPNetB", -999.)
+
+            if useUPT:
+                btagger1_RPT = -999.
+                btagger1_UPT = getattr(jets[jet1index], "btagUParTAK4B", -999.)
+            else:
+                btagger1_RPT = getattr(jets[jet1index], "btagRobustParTAK4B", -999.)
+                btagger1_UPT = -999.
+
+            if len(ranked_jet_idxs) >= 2:
+                jet2index = ranked_jet_idxs[1]
+                Jet2 = ROOT.TLorentzVector()
+                Jet2.SetPtEtaPhiM(
+                    jets[jet2index].pt,
+                    jets[jet2index].eta,
+                    jets[jet2index].phi,
+                    jets[jet2index].mass
+                )
+
+                pTj2 = Jet2.Pt()
+                etaj2 = Jet2.Eta()
+                phij2 = Jet2.Phi()
+                mj2 = Jet2.M()
+
+                btagger2_DJ = getattr(jets[jet2index], "btagDeepFlavB", -999.)
+                btagger2_PN = getattr(jets[jet2index], "btagPNetB", -999.)
+
+                if useUPT:
+                    btagger2_RPT = -999.
+                    btagger2_UPT = getattr(jets[jet2index], "btagUParTAK4B", -999.)
+                else:
+                    btagger2_RPT = getattr(jets[jet2index], "btagRobustParTAK4B", -999.)
+                    btagger2_UPT = -999.
+
+                invjj = (Jet1 + Jet2).M()
+
         if self.analysisMode in ["2l2j", "4l2j"] and foundZZCandidate:
             pTj1 = self.worker.pTj1
             etaj1 = self.worker.etaj1
@@ -771,7 +828,7 @@ class HZZAnalysisCppProducer(Module):
 
             invjj = self.worker.invjj
 
-        if self.analysisMode in ["4l", "4l2j"] and passedFullSelection:
+        if self.analysisMode in ["4l", "4l1j", "4l2j"] and passedFullSelection:
             pT4l = self.worker.ZZsystem.Pt()
             eta4l = self.worker.ZZsystem.Eta()
             phi4l = self.worker.ZZsystem.Phi()
@@ -787,7 +844,7 @@ class HZZAnalysisCppProducer(Module):
         if self.worker.flag4mu:
             mass4mu = mass4l
 
-        if self.analysisMode in ["4l", "4l2j"] and (self.worker.isFSR == False and passedFullSelection):
+        if self.analysisMode in ["4l", "4l1j", "4l2j"] and (self.worker.isFSR == False and passedFullSelection):
             pT4l = self.worker.ZZsystemnofsr.Pt()
             eta4l = self.worker.ZZsystemnofsr.Eta()
             phi4l = self.worker.ZZsystemnofsr.Phi()

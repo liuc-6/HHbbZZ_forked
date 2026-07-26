@@ -108,7 +108,7 @@ keep njet*
 keep D_*
 keep lep*
 keep invjj
-#keep goodJet*
+keep goodJet*
 keep Flag_JetVetoed*
 keep mass4e
 keep mass4mu
