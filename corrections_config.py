@@ -776,7 +776,7 @@ def get_jet_correction_2024(data_tag, isMC):
         JERsfKey = None
         JERsfUncKey = None
 
-    json_JERC = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/Run3-24CDEReprocessingFGHIPrompt-Summer24-NanoAODv15/2025-12-02/jet_jerc.json.gz"
+    json_JERC = "/cvmfs/cms-griddata.cern.ch/cat/metadata/JME/%s/jet_jerc.json.gz" % (folderKey)
     json_JERsmear = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/JME/jer_smear.json.gz"
     
     # Configuration flags

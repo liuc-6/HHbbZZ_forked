@@ -689,7 +689,7 @@ bool H4LTools::BuildZZCandidate(){
                     Zb = lepN2 + lepM2;
                 }
                 if (fabs(Za.M()-Zmass)<fabs(Zb.M()-Zmass)){
-                    if ( (fabs(Za.M()-Zmass)<abs(zZ1.M()-Zmass)) && (Zb.M()<MZcutdown) ) passSmartCut=false;
+                    if ( (fabs(Za.M()-Zmass)<fabs(zZ1.M()-Zmass)) && (Zb.M()<MZcutdown) ) passSmartCut=false;
                 }
                 else{
                     if ( (fabs(Zb.M()-Zmass)<fabs(zZ1.M()-Zmass)) && (Za.M()<MZcutdown) ) passSmartCut=false;
