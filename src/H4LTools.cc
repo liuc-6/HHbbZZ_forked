@@ -61,7 +61,7 @@ std::vector<unsigned int> H4LTools::goodElectrons2015_noIso_noBdt(std::vector<un
     return bestElectronindex;
 }
 
-std::vector<bool> H4LTools::pass_Ele_Id(int nanoVersion){
+std::vector<bool> H4LTools::pass_Ele_Id(){
     std::vector<bool> passid;
 
     for (unsigned int i = 0; i < Electron_pt.size(); i++){
