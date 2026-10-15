@@ -40,9 +40,9 @@ keep PS*
 #     Leptons
 # keep nPhotonF
 # keep Photon*
-# keep nElectron
+keep nElectron
 keep Electron*
-# keep nMuon
+keep nMuon
 keep Muon*
 # keep nTau
 # keep Tau*
@@ -109,6 +109,7 @@ keep *j1
 keep *j2
 keep pass*
 keep GEN*
+keep nZXCRFailedLeptons
 keep njet*
 keep lep*
 keep invjj
