@@ -118,6 +118,7 @@ keep Flag_JetVetoed*
 keep mass4e
 keep mass4mu
 keep mass2e2mu
+keep is*
 #
 #
 #       kFactors

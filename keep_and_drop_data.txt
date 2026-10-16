@@ -82,6 +82,7 @@ keep invjj
 keep mass4e
 keep mass4mu
 keep mass2e2mu
+keep is*
 #
 #    check 2l2j
 keep eventPass*

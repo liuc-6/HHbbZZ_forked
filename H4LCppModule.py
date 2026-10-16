@@ -195,6 +195,10 @@ class HZZAnalysisCppProducer(Module):
         self.out.branch("prefiringWeight", "F")
         self.out.branch("passedTrig", "O")
         self.out.branch("passedFullSelection", "O")
+        
+        self.out.branch("isSR", "O")
+        self.out.branch("isZXCR", "O")
+
         self.out.branch("passedZ4lSelection", "O")
         self.out.branch("passedZ4lZ1LSelection", "O")
         self.out.branch("passedZ4lZXCRSelection", "O")
@@ -499,6 +503,9 @@ class HZZAnalysisCppProducer(Module):
         met = (float(event.PuppiMET_pt) if "PuppiMET_pt" in branches else
                float(event.MET_pt) if "MET_pt" in branches else float("nan"))
         foundZXCRCandidate = self.worker.ZXCRSelection(met) if hasTwoTightLeps else False
+        isSR = bool(foundZZCandidate)
+        isZXCR = bool(foundZXCRCandidate)
+        
         passedZ1LSelection = bool(self.worker.passedZXCR2P1FSelection)
         passedZXCRSelection = bool(self.worker.passedZXCR2P2FSelection or
                                    self.worker.passedZXCR3P1FSelection)
@@ -1004,6 +1011,10 @@ class HZZAnalysisCppProducer(Module):
         
         self.out.fillBranch("passedTrig", passedTrig)
         self.out.fillBranch("passedFullSelection", passedFullSelection)
+        
+        self.out.fillBranch("isSR", isSR)
+        self.out.fillBranch("isZXCR", isZXCR)
+        
         self.out.fillBranch("passedZ4lSelection", passedZ4lSelection)
         self.out.fillBranch("passedZ4lZ1LSelection", passedZ4lZ1LSelection)
         self.out.fillBranch("passedZ4lZXCRSelection", passedZ4lZXCRSelection)
