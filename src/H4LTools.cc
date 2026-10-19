@@ -61,7 +61,7 @@ std::vector<unsigned int> H4LTools::goodElectrons2015_noIso_noBdt(std::vector<un
     return bestElectronindex;
 }
 
-std::vector<bool> H4LTools::pass_Ele_Id(){
+std::vector<bool> H4LTools::pass_Ele_Id(int nanoVersion){
     std::vector<bool> passid;
 
     for (unsigned int i = 0; i < Electron_pt.size(); i++){
@@ -282,9 +282,12 @@ void H4LTools::LeptonSelection(){
     const std::vector<bool> AllMuid = pass_Mu_Id();
     std::vector<unsigned int> tighteleforjetidx;
     std::vector<unsigned int> tightmuforjetidx;
+    std::vector<float> Eiso;
     std::vector<float> Muiso;
     std::vector<bool> Eid;
     std::vector<bool> muid;
+
+    /*
     for (unsigned int iuj=0;iuj<step1Ele.size();iuj++){
         if(AllEid[step1Ele[iuj]]) tighteleforjetidx.push_back(step1Ele[iuj]);
     }
@@ -292,6 +295,102 @@ void H4LTools::LeptonSelection(){
         if(AllMuid[step1Mu[juj]]) tightmuforjetidx.push_back(step1Mu[juj]);
     }
     jetidx = SelectedJets(tighteleforjetidx,tightmuforjetidx);
+    */
+//---------check run2 lep cleaning----------------
+    const auto goodFSR = goodFsrPhotons();
+    // Electron cleaning: ID + SIP3D + Isolation
+    for (unsigned int idx : step1Ele) {
+
+        if (!AllEid[idx]) continue;
+        if (fabs(Electron_sip3d[idx]) >= 4.0) continue;
+
+        const float pt = Electron_pt[idx];
+        if (pt <= 0.0f) continue;
+
+        const float chargedIso = Electron_pfRelIso03_chg[idx] * pt;
+        const float totalIso   = Electron_pfRelIso03_all[idx] * pt;
+
+        float fsrPtSum = 0.0f;
+
+        unsigned int fsrIdx = doFsrRecovery_Run3(goodFSR, idx, 11);
+
+        if (isFSR && fsrIdx < 900 && Electron_pt[idx] > 0) {
+            TLorentzVector ele, fsr;
+
+            ele.SetPtEtaPhiM(
+                Electron_pt[idx], Electron_eta[idx],
+                Electron_phi[idx], Electron_mass[idx]
+            );
+
+            fsr.SetPtEtaPhiM(
+                FsrPhoton_pt[fsrIdx], FsrPhoton_eta[fsrIdx],
+                FsrPhoton_phi[fsrIdx], 0
+            );
+
+            const float dR = ele.DeltaR(fsr);
+            const float scEta =
+                Electron_eta[idx] + Electron_deltaEtaSC[idx];
+
+            if (dR < 0.3 &&
+                (fabs(scEta) < 1.479 || dR > 0.08)) {
+                fsrPtSum += FsrPhoton_pt[fsrIdx];
+            }
+        }
+
+        const float neutralIso = std::max(0.0f, totalIso - chargedIso);
+        const float relIso = (chargedIso + std::max(0.0f, neutralIso - fsrPtSum)) / pt;
+
+        if (std::isfinite(relIso) && relIso < 0.35)
+            tighteleforjetidx.push_back(idx);
+    }
+
+    // Muon cleaning: ID + SIP3D + Isolation
+    for (unsigned int idx : step1Mu) {
+
+        if (!AllMuid[idx]) continue;
+        if (fabs(Muon_sip3d[idx]) >= 4.0) continue;
+
+        const float pt = Muon_pt[idx];
+        if (pt <= 0.0f) continue;
+
+        const float chargedIso = Muon_pfRelIso03_chg[idx] * pt;
+        const float totalIso   = Muon_pfRelIso03_all[idx] * pt;
+
+        float fsrPtSum = 0.0f;
+
+        unsigned int fsrIdx = doFsrRecovery_Run3(goodFSR, idx, 13);
+
+        if (isFSR && fsrIdx < 900) {
+            TLorentzVector mu, fsr;
+
+            mu.SetPtEtaPhiM(
+                Muon_pt[idx], Muon_eta[idx],
+                Muon_phi[idx], Muon_mass[idx]
+            );
+
+            fsr.SetPtEtaPhiM(
+                FsrPhoton_pt[fsrIdx], FsrPhoton_eta[fsrIdx],
+                FsrPhoton_phi[fsrIdx], 0
+            );
+
+            const float dR = mu.DeltaR(fsr);
+            if (dR > 0.01 && dR < 0.3)
+                fsrPtSum += FsrPhoton_pt[fsrIdx];
+        }
+
+        // Protect the charged isolation contribution
+        const float neutralIso = std::max(0.0f, totalIso - chargedIso);
+        const float relIso = (chargedIso + std::max(0.0f, neutralIso - fsrPtSum)) / pt;
+
+        if (std::isfinite(relIso) && relIso < 0.35)
+            tightmuforjetidx.push_back(idx);
+    }
+
+    // Apply jet-lepton cleaning
+    jetidx = SelectedJets(tighteleforjetidx, tightmuforjetidx);
+//---------check run2 lep cleaning----------------
+
+
 
     for(unsigned int ie=0; ie<Electronindex.size();ie++){
         if(Electron_pdgId[Electronindex[ie]]>0){
@@ -305,6 +404,7 @@ void H4LTools::LeptonSelection(){
         Elelist.push_back(Ele);
         ElelistFsr.push_back(Electrondressed_Run3[Electronindex[ie]]);
         Eid.push_back(AllEid[Electronindex[ie]]);
+        Eiso.push_back(Electron_pfRelIso03_all[Electronindex[ie]]);
     }
 
     for(unsigned int imu=0; imu<Muonindex.size();imu++){
