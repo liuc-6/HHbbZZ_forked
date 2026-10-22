@@ -39,10 +39,6 @@ keep *Weight
 keep *Weight*
 #keep nPhoton
 #keep Photon*
-keep nElectron
-keep Electron*
-keep nMuon
-keep Muon*
 #keep nTau
 #keep Tau*
 #keep HTXS*
@@ -56,8 +52,6 @@ keep Muon*
 #keep FatJet*
 #keep nIsoTrack
 #keep IsoTrack*
-#keep nJet
-#keep Jet*
 #keep nLowPtElectron
 #keep LowPtElectron*
 #keep MET*
@@ -65,8 +59,6 @@ keep Pileup*
 keep PuppiMET*
 #keep RawMET*
 #keep RawPuppiMET*
-#keep fixedGridRho*
-#keep Rho_*
 #keep nSubJet
 #keep SubJet*
 #keep TkMET*
@@ -86,3 +78,16 @@ keep is*
 #
 #    check 2l2j
 keep eventPass*
+#
+#    Preserve all jets/leptons of retained events, not only the selected dijet.
+keep nElectron
+keep Electron*
+keep nMuon
+keep Muon*
+keep nJet
+keep Jet*
+keep ngoodJets
+keep goodJet*
+keep Flag_JetVetoed*
+keep Rho_*
+keep fixedGridRho*

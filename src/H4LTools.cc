@@ -567,7 +567,7 @@ bool H4LTools::BuildBestDijet(){
             }
             else if(
                 (Jet_btagParTAK4B[jetidx[pj]] > Jet_btagParTAK4B[jet2index]) &&
-                (Jet_btagParTAK4B[jetidx[pj]] < Jet_btagParTAK4B[jet1index])
+                (Jet_btagParTAK4B[jetidx[pj]] <= Jet_btagParTAK4B[jet1index])
             ){
                 jet2index = jetidx[pj];
             }

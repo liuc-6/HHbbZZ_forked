@@ -77,8 +77,6 @@ keep Pileup*
 keep PuppiMET*
 # keep RawMET*
 # keep RawPuppiMET*
-# keep fixedGridRho*
-# keep Rho_*
 #keep nSubJet
 #keep SubJet*
 #keep TkMET*
@@ -113,7 +111,7 @@ keep nZXCRFailedLeptons
 keep njet*
 keep lep*
 keep invjj
-#keep goodJet*
+keep goodJet*
 keep Flag_JetVetoed*
 keep mass4e
 keep mass4mu
@@ -128,3 +126,7 @@ keep ggZZ*
 #
 #    check 2l2j
 keep eventPass*
+#
+#    Inputs retained for downstream jet studies after the 4l event selection.
+keep Rho_*
+keep fixedGridRho*
