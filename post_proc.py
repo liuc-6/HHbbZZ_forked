@@ -42,7 +42,7 @@ def main():
     testfilelist = []
     modulesToRun = []
     isMC = True
-    isFSR = False
+    isFSR = True
     year = None
     data_tag = ""
     cfgFile = None
