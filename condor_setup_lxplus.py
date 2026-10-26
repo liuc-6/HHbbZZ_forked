@@ -153,6 +153,9 @@ def main(args):
     outScript.write("\n"+'rm *.root');
     outScript.write("\n"+'scramv1 b ProjectRename');
     outScript.write("\n"+'eval `scram runtime -sh`');
+    outScript.write("\n"+'echo "Setting up JHUGenMELA environment..."');
+    outScript.write("\n"+'source setup_mela_env.sh || exit 1');
+    outScript.write("\n"+'echo "MELA environment setup completed."');
     # outScript.write("\n"+'sed -i "s/ifRunningOnCondor = .*/ifRunningOnCondor = True/g" '+post_proc_to_run);
     # outScript.write("\n"+'sed -i "s/testfile = .*/testfile = \\"${1}\\"/g" '+post_proc_to_run);
     outScript.write("\n"+'echo "========================================="');
