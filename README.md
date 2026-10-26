@@ -60,15 +60,25 @@ scramv1 b -j 8
    find PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim/.git/ -name "*.py*" -delete
    ```
 
+4. Step: 4: Get the MELA package
 
-4. Step: 4: interactive running
-
+   The JHUGenMELA package is required to calculate LHEMela_costhetastar for qqZZ samples.
    ```bash
    cd $CMSSW_BASE/src/PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim
+   git clone https://github.com/JHUGen/JHUGenMELA.git JHUGenMELA
+   (cd JHUGenMELA; git checkout -b from-v242 v2.4.2; ./setup.sh)
+   ```
+   
+5. Step: 5: interactive running
+   
+   Before running the analysis, source the MELA environment setup script:
+   ```bash
+   cd $CMSSW_BASE/src/PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim
+   source setup_mela_env.sh
    python post_proc.py -i <dataset>
    ```
 
-5. batch job submission.
+6. batch job submission.
    1. Step: 5 (a): Condor-job submission (recommended)
       1. In the file [condor_setup_lxplus.py](condor_setup_lxplus.py), specify the correct input text file (present inside directory [input_data_Files](input_data_Files)) from which you need to take input NanoAOD DAS names. Also, updated the output EOS path. Then do the following:
 
