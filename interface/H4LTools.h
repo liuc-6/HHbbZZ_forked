@@ -182,7 +182,7 @@ class H4LTools {
       std::vector<bool> pass_Ele_Id(int nanoVersion);
       std::vector<bool> pass_Mu_Id();
       std::vector<unsigned int> goodFsrPhotons();
-      unsigned doFsrRecovery_Run3(std::vector<unsigned int> goodfsridx, unsigned lepidx, int lepflavor);//lepflavor 11 or 13
+      void doFsrRecovery_Run3();
       void BatchFsrRecovery_Run3();
       std::vector<float> ElectronFsrPt();
       std::vector<float> ElectronFsrEta();

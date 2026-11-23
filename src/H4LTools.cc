@@ -5,6 +5,7 @@
 #include <TLorentzVector.h>
 #include <vector>
 #include <stdexcept>
+#include <limits>
 
 int H4LTools::SelectVariation(const H4LTools& nominal, unsigned int source,
                              const std::vector<float>& pt, const std::vector<float>& mass, float met){
@@ -80,7 +81,7 @@ std::vector<unsigned int> H4LTools::goodMuons2015_noIso_noPf(std::vector<unsigne
     std::vector<unsigned int> bestMuonindex;
     for (unsigned int i=0; i<Muonindex.size(); i++){
         if ((Muon_pt[Muonindex[i]]>MuPtcut)&&(fabs(Muon_eta[Muonindex[i]])<MuEtacut)&&(Muon_isGlobal[Muonindex[i]]||Muon_isTracker[Muonindex[i]])){
-            if (Muon_sip3d[Muonindex[i]]<Musip3dCut){
+            if (std::fabs(Muon_sip3d[Muonindex[i]]) < Musip3dCut){
                 if((fabs(Muon_dxy[Muonindex[i]])<MuLoosedxycut)&&(fabs(Muon_dz[Muonindex[i]])<MuLoosedzcut)){
                     bestMuonindex.push_back(Muonindex[i]);
                 }
@@ -95,7 +96,7 @@ std::vector<unsigned int> H4LTools::goodElectrons2015_noIso_noBdt(std::vector<un
     std::vector<unsigned int> bestElectronindex;
     for (unsigned int i=0; i<Electronindex.size(); i++){
         if ((Electron_pt[Electronindex[i]])>elePtcut){
-            if(Electron_sip3d[Electronindex[i]]<elesip3dCut){
+            if(std::fabs(Electron_sip3d[Electronindex[i]]) < elesip3dCut){
                 if((fabs(Electron_dxy[Electronindex[i]])<eleLoosedxycut)&&(fabs(Electron_dz[Electronindex[i]])<eleLoosedzcut)){
                     bestElectronindex.push_back(Electronindex[i]);
                 }
@@ -154,9 +155,7 @@ std::vector<bool> H4LTools::pass_Mu_Id() {
 std::vector<unsigned int> H4LTools::goodFsrPhotons(){
     std::vector<unsigned int> goodFsrPhoton;
     for (unsigned int i=0; i<FsrPhoton_pt.size(); i++){
-        if((FsrPhoton_pt[i]>fsrphotonPtcut)&&(fabs(FsrPhoton_eta[i])<fsrphotonEtacut)&&(FsrPhoton_relIso03[i]<fsrphotonIsocut) &&
-           std::isfinite(FsrPhoton_dROverEt2[i]) && FsrPhoton_dROverEt2[i] >= 0. &&
-           FsrPhoton_dROverEt2[i] < fsrphotonDROverPt2cut){
+        if((FsrPhoton_pt[i]>fsrphotonPtcut)&&(fabs(FsrPhoton_eta[i])<fsrphotonEtacut)&&(FsrPhoton_relIso03[i]<fsrphotonIsocut)) {
             goodFsrPhoton.push_back(i);
         }
     }
@@ -207,69 +206,117 @@ std::vector<unsigned int> H4LTools::SelectedJets(std::vector<unsigned int> ele, 
     return goodJets;
 }
 
-unsigned H4LTools::doFsrRecovery_Run3(std::vector<unsigned int> goodfsridx, unsigned lepidx, int lepflavor){
-    // Keep NanoAOD photon->lepton ownership, then choose the lowest stored
-    // dR/ET^2 among ANALYSIS-qualified photons. NanoAOD backlinks use looser cuts.
-    unsigned matched = FsrPhoton_pt.size(); // out-of-range means no match
-    float bestScore = fsrphotonDROverPt2cut;
-    TLorentzVector lepton;
-    if (lepflavor == 11){
-        lepton.SetPtEtaPhiM(Electron_pt[lepidx], Electron_eta[lepidx], Electron_phi[lepidx], Electron_mass[lepidx]);
-    } else if (lepflavor == 13){
-        lepton.SetPtEtaPhiM(Muon_pt[lepidx], Muon_eta[lepidx], Muon_phi[lepidx], Muon_mass[lepidx]);
-    } else {
-        return matched;
-    }
-    for (const auto index : goodfsridx){
-        const int owner = lepflavor == 11 ? FsrPhoton_electronIdx[index] : FsrPhoton_muonIdx[index];
-        if (owner != static_cast<int>(lepidx)) continue;
+void H4LTools::doFsrRecovery_Run3(){
+
+    ElectronFsrPhotonIdx.assign(Electron_pt.size(), -1);
+    MuonFsrPhotonIdx.assign(Muon_pt.size(), -1);
+
+    if (!isFSR) return;
+
+    // 1. Build relaxed leptons before tight ID
+    const auto relaxedEle = goodElectrons2015_noIso_noBdt(goodLooseElectrons2012());
+    const auto relaxedMu = goodMuons2015_noIso_noPf(goodLooseMuons2012());
+
+    // 2. Store the best photon score for each lepton
+    std::vector<double> bestEleScore(
+        Electron_pt.size(),
+        std::numeric_limits<double>::infinity()
+    );
+    std::vector<double> bestMuScore(
+        Muon_pt.size(),
+        std::numeric_limits<double>::infinity()
+    );
+
+
+    // 3. Loop over FSR photon candidates
+    for (const auto ip : goodFsrPhotons()){
+
         TLorentzVector photon;
-        photon.SetPtEtaPhiM(FsrPhoton_pt[index], FsrPhoton_eta[index], FsrPhoton_phi[index], 0.);
-        if (lepton.DeltaR(photon) >= fsrphotonDRcut) continue;
-        if (FsrPhoton_dROverEt2[index] < bestScore){
-            bestScore = FsrPhoton_dROverEt2[index];
-            matched = index; // strict comparison keeps the first index on exact ties
+        photon.SetPtEtaPhiM(FsrPhoton_pt[ip], FsrPhoton_eta[ip], FsrPhoton_phi[ip], 0.);
+
+        const double pt2 = double(FsrPhoton_pt[ip]) * FsrPhoton_pt[ip];
+        double minDR = fsrphotonDRcut;
+
+        int closestEle = -1;
+        int closestMu = -1;
+
+        // 4. Check all relaxed muons
+        for (const auto im : relaxedMu){
+
+            TLorentzVector muon;
+            muon.SetPtEtaPhiM(Muon_pt[im], Muon_eta[im], Muon_phi[im], Muon_mass[im]);
+
+            const double dR = photon.DeltaR(muon);
+            const double score = dR / pt2;
+
+            if (dR > 0.001 && dR < minDR && score < fsrphotonDROverPt2cut){
+                minDR = dR;
+                closestMu = static_cast<int>(im);
+                closestEle = -1;
+            }
+        }
+
+        // 5. Check all relaxed electrons
+        for (const auto ie : relaxedEle){
+
+            TLorentzVector electron;
+            electron.SetPtEtaPhiM(Electron_pt[ie], Electron_eta[ie], Electron_phi[ie], Electron_mass[ie]);
+
+            const double dR = photon.DeltaR(electron);
+            const double score = dR / pt2;
+
+            if (dR > 0.001 && dR < minDR && score < fsrphotonDROverPt2cut){
+                minDR = dR;
+                closestEle = static_cast<int>(ie);
+                closestMu = -1;
+            }
+        }
+
+        // 6. Keep only the best photon per lepton
+        const double score = minDR / pt2;
+
+        if (closestMu >= 0 && score < bestMuScore[closestMu]){
+            bestMuScore[closestMu] = score;
+            MuonFsrPhotonIdx[closestMu] = static_cast<int>(ip);
+        }
+        if (closestEle >= 0 && score < bestEleScore[closestEle]){
+            bestEleScore[closestEle] = score;
+            ElectronFsrPhotonIdx[closestEle] = static_cast<int>(ip);
         }
     }
-    return matched;
 }
 
 void H4LTools::BatchFsrRecovery_Run3(){
-    Electrondressed_Run3.clear(); Muondressed_Run3.clear();
-    ElectronFsrPhotonIdx.clear(); MuonFsrPhotonIdx.clear(); MuonFsrRelIso03.clear();
-    const auto photons = goodFsrPhotons();
+
+    Electrondressed_Run3.clear(); Muondressed_Run3.clear(); MuonFsrRelIso03.clear();
+
+    // Reassociate all photons once per event
+    doFsrRecovery_Run3();
+
     for (unsigned int i = 0; i < Electron_pt.size(); ++i){
-        TLorentzVector lepton;
-        lepton.SetPtEtaPhiM(Electron_pt[i], Electron_eta[i], Electron_phi[i], Electron_mass[i]);
-        const auto index = isFSR ? doFsrRecovery_Run3(photons, i, 11) : FsrPhoton_pt.size();
-        const bool matched = index < FsrPhoton_pt.size();
-        ElectronFsrPhotonIdx.push_back(matched ? static_cast<int>(index) : -1);
-        if (matched){
-            TLorentzVector photon;
-            photon.SetPtEtaPhiM(FsrPhoton_pt[index], FsrPhoton_eta[index], FsrPhoton_phi[index], 0.);
-            lepton += photon;
+        TLorentzVector lep, fsr;
+        lep.SetPtEtaPhiM(Electron_pt[i], Electron_eta[i], Electron_phi[i], Electron_mass[i]);
+        const int idx = ElectronFsrPhotonIdx[i];
+        if (idx >= 0){
+            fsr.SetPtEtaPhiM(FsrPhoton_pt[idx], FsrPhoton_eta[idx], FsrPhoton_phi[idx], 0.);
+            lep += fsr;
         }
-        Electrondressed_Run3.push_back(lepton);
+        Electrondressed_Run3.push_back(lep);
     }
     for (unsigned int i = 0; i < Muon_pt.size(); ++i){
-        TLorentzVector lepton;
-        lepton.SetPtEtaPhiM(Muon_pt[i], Muon_eta[i], Muon_phi[i], Muon_mass[i]);
-        const auto index = isFSR ? doFsrRecovery_Run3(photons, i, 13) : FsrPhoton_pt.size();
-        const bool matched = index < FsrPhoton_pt.size();
-        MuonFsrPhotonIdx.push_back(matched ? static_cast<int>(index) : -1);
+        TLorentzVector lep, fsr;
+        lep.SetPtEtaPhiM(Muon_pt[i], Muon_eta[i], Muon_phi[i], Muon_mass[i]);
+        const int idx = MuonFsrPhotonIdx[i];
         float isolation = Muon_pfRelIso03_all[i];
-        if (matched){
-            TLorentzVector photon;
-            photon.SetPtEtaPhiM(FsrPhoton_pt[index], FsrPhoton_eta[index], FsrPhoton_phi[index], 0.);
-            const double dR = lepton.DeltaR(photon);
-            // The isolation cone is distinct from the wider recovery cone.
-            if (dR > 0.01 && dR < 0.3){
-                isolation = std::max(0.f, isolation - FsrPhoton_pt[index] / Muon_pt[i]);
-            }
-            lepton += photon;
+        if (idx >= 0){
+            fsr.SetPtEtaPhiM(FsrPhoton_pt[idx], FsrPhoton_eta[idx], FsrPhoton_phi[idx], 0.);
+            const double dR = lep.DeltaR(fsr);
+            if (dR > 0.01 && dR < 0.3)
+                isolation = std::max(0.f, isolation - FsrPhoton_pt[idx] / Muon_pt[i]);
+            lep += fsr;
         }
         MuonFsrRelIso03.push_back(isolation);
-        Muondressed_Run3.push_back(lepton);
+        Muondressed_Run3.push_back(lep);
     }
 }
 
@@ -386,8 +433,8 @@ void H4LTools::LeptonSelection(){
         }
     }
     for(unsigned int amu=0; amu<muid.size();amu++){
-        const float RelIsoNoFsr = MuonFsrRelIso03[Muonindex[amu]];
-        if((muid[amu]==true)&&(RelIsoNoFsr<0.35)){
+
+        if(muid[amu]==true){
             nTightMu++;
             TightMuindex.push_back(amu);
             nTightMuChgSum += Muchg[amu];
@@ -729,12 +776,12 @@ bool H4LTools::BuildZZCandidate(){
             ghosttag++;
             bool nPassPt20;
             int nPassPt10;
-            nPassPt20 = (Zlep1pt[m]>20) || (Zlep2pt[m]>20) || (Zlep1pt[n]>20) || (Zlep2pt[n]>20);
+            nPassPt20 = (Zlep1ptNoFsr[m]>20) || (Zlep2ptNoFsr[m]>20) || (Zlep1ptNoFsr[n]>20) || (Zlep2ptNoFsr[n]>20);
             nPassPt10 = 0;
-            if (Zlep1pt[m]>10) nPassPt10 += 1;
-            if (Zlep2pt[m]>10) nPassPt10 += 1;
-            if (Zlep1pt[n]>10) nPassPt10 += 1;
-            if (Zlep2pt[n]>10) nPassPt10 += 1;
+            if (Zlep1ptNoFsr[m]>10) nPassPt10++;
+            if (Zlep2ptNoFsr[m]>10) nPassPt10++;
+            if (Zlep1ptNoFsr[n]>10) nPassPt10++;
+            if (Zlep2ptNoFsr[n]>10) nPassPt10++;
             if (nPassPt10 < 2) continue;
             if (nPassPt20 == false) continue; //lep Pt requirements
             lepPtTag++;
