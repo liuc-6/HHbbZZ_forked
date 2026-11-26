@@ -6,11 +6,19 @@ import os
 from array import array
 from Helper import *
 from selection_variations import VIEWS, FIELDS, shifted_value, validate_inputs, snapshot, fill_results
+from corrections_config import (
+    book_hzz_ele_sf_branches,
+    fill_hzz_ele_sf_branches,
+    book_lowptmva_mu_sf_branches,
+    fill_lowptmva_mu_sf_branches,
+)
+from LepIDsf_run3.Ele_HZZid_SF import HZZElectronIDSF
+from LepIDsf_run3.Mu_LowptMVA_SF import HZZMuonLowPtMVASF
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 
 class HZZAnalysisCppProducer(Module):
-    def __init__(self, year, cfgFile, isMC, isFSR, analysisMode, nanoVersion, doSystematics=True):
+    def __init__(self, year, cfgFile, isMC, isFSR, analysisMode, nanoVersion, doSystematics=True, dataTag=None):
         base = "$CMSSW_BASE/src/PhysicsTools/NanoAODTools/python/postprocessing/analysis/nanoAOD_skim"
 
         if "/GenAnalysis_cc.so" not in ROOT.gSystem.GetLibraries():
@@ -37,6 +45,16 @@ class HZZAnalysisCppProducer(Module):
         self.isMC = isMC
         self.analysisMode = analysisMode
         self.nanoVersion = nanoVersion
+        self.hzzElectronIDSF = (
+            HZZElectronIDSF(year, dataTag)
+            if isMC and year in (2022, 2023, 2024)
+            else None
+        )
+        self.LowptMVAMuonIDSF = (
+            HZZMuonLowPtMVASF(year, dataTag)
+            if isMC and year in (2022, 2023, 2024)
+            else None
+        )
         self.genworker = ROOT.GenAnalysis()
 
         self.isFSR = isFSR
@@ -136,6 +154,8 @@ class HZZAnalysisCppProducer(Module):
         self._branchTree = None
         self._inputBranches = None
         self.out = wrappedOutputTree
+        book_hzz_ele_sf_branches(self.out)
+        book_lowptmva_mu_sf_branches(self.out)
 
         for field, kind in FIELDS.items():
             self.out.branch("Sel_" + field, kind, lenVar="nSel")
@@ -1035,6 +1055,103 @@ class HZZAnalysisCppProducer(Module):
             Weight = event.genWeight * dataMCWeight_new * prefiringWeight
         else:
             Weight = 1.0
+            
+
+        # ============================================================
+        # HZZ Electron ID SF
+        # Apply only to selected electrons with pt >= 7 GeV
+        # ============================================================
+
+        electronHZZIDSF = 1.0
+        electronHZZIDSFUp = 1.0
+        electronHZZIDSFDown = 1.0
+        electronHZZIDSFValid = False
+        Weight_withHZZEleID = -999.0
+
+        if self.isMC and foundZZCandidate and self.hzzElectronIDSF is not None:
+
+            all_electrons_covered = True
+
+            for leg in range(4):
+                idx = int(self.worker.candidateLepIdx[leg])
+                pdgid = abs(int(self.worker.candidateLepPdgId[leg]))
+
+                if pdgid != 11:
+                    continue
+
+                ele = electrons[idx]
+
+                if ele.pt < 7.0:
+                    all_electrons_covered = False
+                    continue
+
+                sf, sf_up, sf_down = self.hzzElectronIDSF.evaluate(
+                    ele.pt,
+                    ele.eta,
+                    ele.deltaEtaSC,
+                    ele.phi
+                )
+
+                electronHZZIDSF *= sf
+                electronHZZIDSFUp *= sf_up
+                electronHZZIDSFDown *= sf_down
+
+            electronHZZIDSFValid = all_electrons_covered
+
+            Weight_withHZZEleID = Weight * electronHZZIDSF
+
+
+        # ============================================================
+        # Muon Low-pT MVA ID SF
+        # Apply to final ZZ muons with pt >= 5 GeV
+        # ============================================================
+
+        muonLowPtMVASF = 1.0
+        muonLowPtMVASFUp = 1.0
+        muonLowPtMVASFDown = 1.0
+        muonLowPtMVASFValid = False
+
+        Weight_withLowPtMVAMuID = -999.0
+        Weight_withHZZEleID_LowPtMVAMuID = -999.0
+        HZZEleID_LowPtMVAMuID_SFValid = False
+
+        if self.isMC and foundZZCandidate and self.LowptMVAMuonIDSF is not None:
+
+            all_muons_covered = True
+
+            for leg in range(4):
+                idx = int(self.worker.candidateLepIdx[leg])
+                pdgid = abs(int(self.worker.candidateLepPdgId[leg]))
+
+                if pdgid != 13:
+                    continue
+
+                mu = muons[idx]
+
+                if mu.pt < 5.0:
+                    all_muons_covered = False
+                    continue
+
+                sf, sf_up, sf_down = self.LowptMVAMuonIDSF.evaluate(
+                    mu.pt, mu.eta
+                )
+
+                muonLowPtMVASF *= sf
+                muonLowPtMVASFUp *= sf_up
+                muonLowPtMVASFDown *= sf_down
+
+            muonLowPtMVASFValid = all_muons_covered
+
+            Weight_withLowPtMVAMuID = Weight * muonLowPtMVASF
+
+            Weight_withHZZEleID_LowPtMVAMuID = (
+                Weight * electronHZZIDSF * muonLowPtMVASF
+            )
+
+            HZZEleID_LowPtMVAMuID_SFValid = (
+                electronHZZIDSFValid and muonLowPtMVASFValid
+            )
+
 
         self.out.fillBranch("mass4l", mass4l)
         self.out.fillBranch("GENmass4l", GENmass4l)
@@ -1126,6 +1243,25 @@ class HZZAnalysisCppProducer(Module):
         self.out.fillBranch("dataMCWeight_new", dataMCWeight_new)
         self.out.fillBranch("prefiringWeight", prefiringWeight)
         self.out.fillBranch("Weight", Weight)
+        
+        fill_hzz_ele_sf_branches(
+            self.out,
+            electronHZZIDSF,
+            electronHZZIDSFUp,
+            electronHZZIDSFDown,
+            electronHZZIDSFValid,
+            Weight_withHZZEleID,
+        )
+        fill_lowptmva_mu_sf_branches(
+            self.out,
+            muonLowPtMVASF,
+            muonLowPtMVASFUp,
+            muonLowPtMVASFDown,
+            muonLowPtMVASFValid,
+            Weight_withLowPtMVAMuID,
+            Weight_withHZZEleID_LowPtMVAMuID,
+            HZZEleID_LowPtMVAMuID_SFValid,
+        )
 
         self.out.fillBranch("GENlep_id", GENlep_id)
         self.out.fillBranch("GENlep_Hindex", GENlep_Hindex)

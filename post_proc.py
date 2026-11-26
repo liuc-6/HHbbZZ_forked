@@ -184,9 +184,15 @@ def main():
         preselection_cut = "nMuon + nElectron >= %d" % (2 if analysisMode == "2l2j" else 3)
 
     # main analysis module
-    modulesToRun.append(HZZAnalysisCppProducer(year, cfgFile, isMC, isFSR, analysisMode, nanoVersion,
-                                               doSystematics=not args.NOsyst))
-
+    modulesToRun.append(
+        HZZAnalysisCppProducer(
+            year, cfgFile, isMC, isFSR,
+            analysisMode, nanoVersion,
+            doSystematics=not args.NOsyst,
+            dataTag=data_tag
+        )
+    )
+    
     print(("Input json file: {}".format(jsonFileName)))
     print(("Input cfg file: {}".format(cfgFile)))
     print(("isMC: {}".format(isMC)))

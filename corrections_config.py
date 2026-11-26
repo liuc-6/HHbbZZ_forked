@@ -20,6 +20,88 @@ from PhysicsTools.NanoAODTools.postprocessing.modules.common.muonScaleResProduce
 from kFactorProducer_Run3 import create_kfactor_producer
 
 
+# ============================================================
+# 1. Electron HZZ ID SF
+#    Common for all Run 3 eras (2022-2024)
+# ============================================================
+
+HZZ_ELE_SF_BRANCHES = {
+    "ElectronHZZIDSF":      "F",
+    "ElectronHZZIDSFUp":    "F",
+    "ElectronHZZIDSFDown":  "F",
+    "ElectronHZZIDSFValid": "O",
+    "Weight_withHZZEleID":  "F",
+}
+
+
+def book_hzz_ele_sf_branches(out):
+    for name, dtype in HZZ_ELE_SF_BRANCHES.items():
+        out.branch(name, dtype)
+
+
+def fill_hzz_ele_sf_branches(
+    out, nominal, up, down, valid, weight
+):
+    values = {
+        "ElectronHZZIDSF":      nominal,
+        "ElectronHZZIDSFUp":    up,
+        "ElectronHZZIDSFDown":  down,
+        "ElectronHZZIDSFValid": valid,
+        "Weight_withHZZEleID":  weight,
+    }
+
+    for name, value in values.items():
+        out.fillBranch(name, value)
+
+
+# ============================================================
+# 2. Muon Low-pT MVA ID SF
+#    Common for all Run 3 eras (2022-2024)
+#
+#    Also stores the combined Electron + Muon ID weight.
+# ============================================================
+
+LOWPTMVA_MU_SF_BRANCHES = {
+    # Muon Low-pT MVA ID SF
+    "MuonLowPtMVASF":       "F",
+    "MuonLowPtMVASFUp":     "F",
+    "MuonLowPtMVASFDown":   "F",
+    "MuonLowPtMVASFValid":  "O",
+    "Weight_withLowPtMVAMuID": "F",
+
+    # Combined Electron HZZ ID + Muon Low-pT MVA ID
+    "Weight_withHZZEleID_LowPtMVAMuID": "F",
+    "HZZEleID_LowPtMVAMuID_SFValid":     "O",
+}
+
+
+def book_lowptmva_mu_sf_branches(out):
+    for name, dtype in LOWPTMVA_MU_SF_BRANCHES.items():
+        out.branch(name, dtype)
+
+
+def fill_lowptmva_mu_sf_branches(
+    out, nominal, up, down, valid,
+    weight_mu, weight_combined, combined_valid
+):
+    values = {
+        # Muon Low-pT MVA ID SF
+        "MuonLowPtMVASF":       nominal,
+        "MuonLowPtMVASFUp":     up,
+        "MuonLowPtMVASFDown":   down,
+        "MuonLowPtMVASFValid":  valid,
+        "Weight_withLowPtMVAMuID": weight_mu,
+
+        # Combined Electron + Muon ID SF
+        "Weight_withHZZEleID_LowPtMVAMuID": weight_combined,
+        "HZZEleID_LowPtMVAMuID_SFValid":     combined_valid,
+    }
+
+    for name, value in values.items():
+        out.fillBranch(name, value)
+
+
+
 def get_electron_sf_2022(data_tag, isMC):
     """Get electron scale factor corrections for 2022."""
     if "pre_EE" in data_tag:
@@ -44,17 +126,6 @@ def get_electron_sf_2022(data_tag, isMC):
     eleSF.addCorrection(set_name, era, reco_wp, "sfup", "Reco_sfUp")
     eleSF.addCorrection(set_name, era, reco_wp, "sfdown", "Reco_sfDown")
     
-    # Cut-based ID SF
-    for wp in ["Veto", "Loose", "Medium", "Tight"]:
-        eleSF.addCorrection(set_name, era, wp, "sf", f"ID_{wp}_sf")
-        eleSF.addCorrection(set_name, era, wp, "sfup", f"ID_{wp}_sfUp")
-        eleSF.addCorrection(set_name, era, wp, "sfdown", f"ID_{wp}_sfDown")
-
-    # MVA ID (Iso / NoIso) SF
-    for wp in ["wp80iso", "wp90iso", "wp80noiso", "wp90noiso"]:
-        eleSF.addCorrection(set_name, era, wp, "sf", f"ID_{wp}_sf")
-        eleSF.addCorrection(set_name, era, wp, "sfup", f"ID_{wp}_sfUp")
-        eleSF.addCorrection(set_name, era, wp, "sfdown", f"ID_{wp}_sfDown")
     return eleSF
 
 
@@ -159,18 +230,6 @@ def get_electron_sf_2023(data_tag, isMC):
     eleSF.addCorrection(set_name, era, reco_wp, "sfup", "Reco_sfUp")
     eleSF.addCorrection(set_name, era, reco_wp, "sfdown", "Reco_sfDown")
     
-    # Cut-based ID SF
-    for wp in ["Veto", "Loose", "Medium", "Tight"]:
-        eleSF.addCorrection(set_name, era, wp, "sf", f"ID_{wp}_sf")
-        eleSF.addCorrection(set_name, era, wp, "sfup", f"ID_{wp}_sfUp")
-        eleSF.addCorrection(set_name, era, wp, "sfdown", f"ID_{wp}_sfDown")
-
-    # MVA ID (Iso / NoIso) SF
-    for wp in ["wp80iso", "wp90iso", "wp80noiso", "wp90noiso"]:
-        eleSF.addCorrection(set_name, era, wp, "sf", f"ID_{wp}_sf")
-        eleSF.addCorrection(set_name, era, wp, "sfup", f"ID_{wp}_sfUp")
-        eleSF.addCorrection(set_name, era, wp, "sfdown", f"ID_{wp}_sfDown")
-        
     return eleSF
 
 
@@ -279,17 +338,8 @@ def get_electron_sf_2024(data_tag, isMC):
     eleRecoSF.addCorrection(set_name, era, reco_wp, "sfup", "Reco_sfUp")
     eleRecoSF.addCorrection(set_name, era, reco_wp, "sfdown", "Reco_sfDown")
 
-    # -------------------------
-    # ID SF
-    # -------------------------
-    eleIDSF = electronSF_natlib(reco_id_json)
 
-    for wp in ["wp80iso", "wp90iso", "wp80noiso", "wp90noiso"]:
-        eleIDSF.addCorrection(set_name, era, wp, "sf", f"ID_{wp}_sf")
-        eleIDSF.addCorrection(set_name, era, wp, "sfup", f"ID_{wp}_sfUp")
-        eleIDSF.addCorrection(set_name, era, wp, "sfdown", f"ID_{wp}_sfDown")
-
-    return eleRecoSF, eleIDSF
+    return eleRecoSF
 
 def get_electron_scale_res_2024(data_tag, isMC, overwritePt):
     """Get electron scale/resolution corrections for 2024."""
@@ -916,7 +966,7 @@ def get_corrections_modules(year, data_tag, first_file, isMC, overwritePt, nanoV
         #modules.append(get_btag_sf_2023(data_tag, isMC))
     
     elif year == 2024:
-        modules.extend(get_electron_sf_2024(data_tag, isMC))
+        modules.append(get_electron_sf_2024(data_tag, isMC))
         modules.append(get_muon_sf_2024(data_tag, isMC))
         modules.append(get_muon_scale_res_2024(data_tag, isMC, overwritePt))
         modules.append(get_electron_scale_res_2024(data_tag, isMC, overwritePt))
